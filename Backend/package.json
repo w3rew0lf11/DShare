@@ -3,7 +3,9 @@
   "version": "1.0.0",
   "description": "D-share: Capstone project",
   "main": "server.js",
+  "type": "module",
   "scripts": {
+    "dev": "nodemon start  server.js",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "repository": {
@@ -18,7 +20,8 @@
   "homepage": "https://github.com/kabin55/D_Share#readme",
   "dependencies": {
     "dotenv": "^16.4.7",
-    "express": "^4.21.2"
+    "express": "^4.21.2",
+    "mongoose": "^8.12.1"
   },
   "devDependencies": {
     "nodemon": "^3.1.9"
