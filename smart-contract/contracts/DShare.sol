@@ -17,10 +17,9 @@ contract DShare {
     }
 
     address public owner;
-
     mapping(bytes32 => FileMetadata) public files;
     mapping(address => bool) public isBlocked;
-    mapping(string => bool) private cidExists; // New mapping to track used CIDs
+    mapping(string => bool) private cidExists; // Track used CIDs
 
     event FileUploaded(bytes32 indexed fileHash, address indexed uploader, AccessType access);
     event UserBlocked(address indexed user);
@@ -49,10 +48,13 @@ contract DShare {
         AccessType _access,
         address _sharedWith
     ) public notBlocked returns (bytes32 fileHash) {
-        require(!cidExists[_cid], "CID already exists"); //  Prevent duplicate CID
+        require(!cidExists[_cid], "CID already exists"); // Prevent duplicate CID
+        require(bytes(_fileName).length > 0, "File name cannot be empty");
+        require(bytes(_cid).length > 0, "CID cannot be empty");
 
+        // Generate hash without `block.timestamp`
         fileHash = keccak256(abi.encodePacked(
-            _fileName, _author, block.timestamp, _fileType, _fileSize, _cid
+            _fileName, _author, _fileType, _fileSize, _cid
         ));
 
         require(files[fileHash].timestamp == 0, "File already exists");
@@ -71,7 +73,7 @@ contract DShare {
             file.sharedWith = _sharedWith;
         }
 
-        cidExists[_cid] = true; //  Mark this CID as used
+        cidExists[_cid] = true; // Mark CID as used
         emit FileUploaded(fileHash, msg.sender, _access);
     }
 
@@ -79,14 +81,18 @@ contract DShare {
         string memory, string memory, uint, string memory, uint, string memory
     ) {
         FileMetadata memory file = files[fileHash];
+        require(file.timestamp != 0, "File does not exist");
 
-        require(
-            file.access == AccessType.Public ||
-            (file.access == AccessType.Private && file.uploader == msg.sender) ||
-            (file.access == AccessType.Shared &&
-                (file.uploader == msg.sender || file.sharedWith == msg.sender)),
-            "You don't have access to this file"
-        );
+        bool hasAccess = false;
+        if (file.access == AccessType.Public) {
+            hasAccess = true;
+        } else if (file.access == AccessType.Private) {
+            hasAccess = (file.uploader == msg.sender);
+        } else if (file.access == AccessType.Shared) {
+            hasAccess = (file.uploader == msg.sender || file.sharedWith == msg.sender);
+        }
+
+        require(hasAccess, "You don't have access to this file");
 
         return (
             file.fileName,
@@ -106,7 +112,7 @@ contract DShare {
         string memory _cid
     ) public view notBlocked returns (bytes32) {
         return keccak256(abi.encodePacked(
-            _fileName, _author, block.timestamp, _fileType, _fileSize, _cid
+            _fileName, _author, _fileType, _fileSize, _cid
         ));
     }
 
@@ -120,4 +126,3 @@ contract DShare {
         emit UserUnblocked(_user);
     }
 }
-
