@@ -1,0 +1,10 @@
+node_name: "werewolf_main"
+storage_path: "./ipfs_storage_a"
+peers: []
+bootstrap_nodes:
+  - "https://werewolf.loophole.site"  # ← Add your public Loophole URL here
+api_host: "0.0.0.0"
+api_port: 5000
+auth_secret: "your_secure_secret_here"  # Should match across nodes
+replication_timeout: 60
+chunk_size: 262144
