@@ -36,6 +36,42 @@
       "artifacts": [
         "DShare"
       ]
+    },
+    "/mnt/media/DShare/smart-contract/contracts/DShare.sol": {
+      "lastModificationDate": 1753205819785,
+      "contentHash": "bd6c304edaf7b10927ca4e3be0a52ef9",
+      "sourceName": "contracts/DShare.sol",
+      "solcConfig": {
+        "version": "0.8.28",
+        "settings": {
+          "evmVersion": "paris",
+          "optimizer": {
+            "enabled": false,
+            "runs": 200
+          },
+          "outputSelection": {
+            "*": {
+              "*": [
+                "abi",
+                "evm.bytecode",
+                "evm.deployedBytecode",
+                "evm.methodIdentifiers",
+                "metadata"
+              ],
+              "": [
+                "ast"
+              ]
+            }
+          }
+        }
+      },
+      "imports": [],
+      "versionPragmas": [
+        "^0.8.21"
+      ],
+      "artifacts": [
+        "DShare"
+      ]
     }
   }
 }

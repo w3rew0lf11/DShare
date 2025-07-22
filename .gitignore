@@ -70,3 +70,6 @@ server/node_modules/
 dump/
 
 # Optional: log files
+
+
+ipfs/storage/
