@@ -1,0 +1,17 @@
+{
+  "host": "0.0.0.0",
+  "port": 5005,
+  "scan_ports": [5005],
+  "scan_timeout": 1.5,
+  "storage_path": "./storage",
+  "chunk_size": 262144,
+  "peer_timeout": 10,
+  "peer_check_interval": 5,
+  "max_retries": 2,
+  "discovery": {
+    "aggressive_threshold": 3,
+    "moderate_threshold": 5,
+    "scan_threads": 20
+  },
+  "discovery_interval": 5
+}

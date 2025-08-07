@@ -1,0 +1,328 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <title>IPFS Clone - Failback Safety</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+        }
+
+        .node-status {
+            display: flex;
+            margin-bottom: 20px;
+        }
+
+        .node {
+            padding: 10px;
+            margin: 0 10px;
+            border-radius: 5px;
+        }
+
+        .active {
+            background-color: #d4edda;
+            color: #155724;
+        }
+
+        .inactive {
+            background-color: #f8d7da;
+            color: #721c24;
+        }
+
+        .upload-area {
+            border: 2px dashed #ccc;
+            padding: 20px;
+            text-align: center;
+            margin: 20px 0;
+        }
+
+        .file-list {
+            margin-top: 20px;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        th,
+        td {
+            padding: 8px;
+            text-align: left;
+            border-bottom: 1px solid #ddd;
+        }
+
+        .progress {
+            width: 100%;
+            background-color: #f1f1f1;
+        }
+
+        .progress-bar {
+            height: 20px;
+            background-color: #4CAF50;
+            text-align: center;
+            line-height: 20px;
+            color: white;
+        }
+    </style>
+</head>
+
+<body>
+    <h1>IPFS Clone - Failback Safety</h1>
+
+    <div class="node-status" id="nodeStatus">
+        <!-- Node status will be populated by JavaScript -->
+    </div>
+
+    <div class="upload-area" id="uploadArea">
+        <h2>Upload File</h2>
+        <input type="file" id="fileInput">
+        <button onclick="uploadFile()">Upload</button>
+        <div class="progress" id="uploadProgress" style="display: none;">
+            <div class="progress-bar" id="uploadBar" style="width: 0%">0%</div>
+        </div>
+        <div id="uploadStatus"></div>
+    </div>
+
+    <div class="file-list">
+        <h2>Available Files</h2>
+        <table id="fileTable">
+            <thead>
+                <tr>
+                    <th>Filename</th>
+                    <th>CID</th>
+                    <th>Size</th>
+                    <th>Available On</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody id="fileList">
+                <!-- Files will be populated by JavaScript -->
+            </tbody>
+        </table>
+    </div>
+    <div>
+        <h3>File Synchronization</h3>
+        <button onclick="triggerSync()">Sync Now</button>
+        <div id="syncStatus"></div>
+    </div>
+
+    <script>
+        function triggerSync() {
+            fetch('/api/sync', { method: 'POST' })
+                .then(r => r.json())
+                .then(data => {
+                    document.getElementById('syncStatus').textContent = 'Sync started';
+                    setTimeout(listFiles, 3000);
+                });
+        }
+    </script>
+
+    <script>
+        // Configuration
+        const nodes = [
+            { url: "http://192.168.18.21:5000", active: false },
+            { url: "http://192.168.18.53:5000", active: false },
+            { url: "http://192.168.18.54:5000", active: false }
+        ];
+
+        // Check node status
+        async function checkNodeStatus() {
+            const statusDiv = document.getElementById('nodeStatus');
+            statusDiv.innerHTML = '<h2>Node Status</h2>';
+
+            for (const node of nodes) {
+                try {
+                    const response = await fetch(`${node.url}/api/ping`, { timeout: 2000 });
+                    if (response.ok) {
+                        node.active = true;
+                        statusDiv.innerHTML += `
+                            <div class="node active">
+                                ${node.url.replace('http://', '')} - ACTIVE
+                            </div>
+                        `;
+                    } else {
+                        node.active = false;
+                        statusDiv.innerHTML += `
+                            <div class="node inactive">
+                                ${node.url.replace('http://', '')} - INACTIVE
+                            </div>
+                        `;
+                    }
+                } catch (error) {
+                    node.active = false;
+                    statusDiv.innerHTML += `
+                        <div class="node inactive">
+                            ${node.url.replace('http://', '')} - INACTIVE
+                        </div>
+                    `;
+                }
+            }
+
+            // Refresh file list
+            listFiles();
+        }
+
+        // Get first active node
+        function getActiveNode() {
+            return nodes.find(node => node.active)?.url;
+        }
+
+        // Upload file with failback
+        async function uploadFile() {
+            const fileInput = document.getElementById('fileInput');
+            const file = fileInput.files[0];
+
+            if (!file) {
+                alert('Please select a file first');
+                return;
+            }
+
+            const activeNode = getActiveNode();
+            if (!activeNode) {
+                alert('No active nodes available');
+                return;
+            }
+
+            const progressBar = document.getElementById('uploadBar');
+            const progressDiv = document.getElementById('uploadProgress');
+            const statusDiv = document.getElementById('uploadStatus');
+
+            progressDiv.style.display = 'block';
+            statusDiv.textContent = `Uploading to ${activeNode.replace('http://', '')}...`;
+
+            try {
+                const formData = new FormData();
+                formData.append('file', file);
+
+                const xhr = new XMLHttpRequest();
+                xhr.open('POST', `${activeNode}/api/files`, true);
+
+                xhr.upload.onprogress = function (e) {
+                    if (e.lengthComputable) {
+                        const percentComplete = (e.loaded / e.total) * 100;
+                        progressBar.style.width = `${percentComplete}%`;
+                        progressBar.textContent = `${Math.round(percentComplete)}%`;
+                    }
+                };
+
+                xhr.onload = function () {
+                    if (xhr.status === 200) {
+                        const response = JSON.parse(xhr.responseText);
+                        statusDiv.textContent = `Upload successful! CID: ${response.cid}`;
+                        listFiles();
+                    } else {
+                        statusDiv.textContent = `Upload failed: ${xhr.statusText}`;
+                    }
+                    progressDiv.style.display = 'none';
+                };
+
+                xhr.onerror = function () {
+                    statusDiv.textContent = 'Upload failed. Trying next available node...';
+                    // Try next node
+                    const nextNode = nodes.find(node => node.active && node.url !== activeNode)?.url;
+                    if (nextNode) {
+                        statusDiv.textContent += ` Retrying with ${nextNode.replace('http://', '')}`;
+                        xhr.open('POST', `${nextNode}/api/files`, true);
+                        xhr.send(formData);
+                    } else {
+                        statusDiv.textContent = 'All nodes failed. Upload cannot be completed.';
+                        progressDiv.style.display = 'none';
+                    }
+                };
+
+                xhr.send(formData);
+            } catch (error) {
+                statusDiv.textContent = `Upload error: ${error.message}`;
+                progressDiv.style.display = 'none';
+            }
+        }
+
+        // List files with availability
+        async function listFiles() {
+            const activeNode = getActiveNode();
+            if (!activeNode) {
+                document.getElementById('fileList').innerHTML = '<tr><td colspan="5">No active nodes available</td></tr>';
+                return;
+            }
+
+            try {
+                const response = await fetch(`${activeNode}/api/files`);
+                if (response.ok) {
+                    const files = await response.json();
+                    const fileList = document.getElementById('fileList');
+                    fileList.innerHTML = '';
+
+                    if (files.length === 0) {
+                        fileList.innerHTML = '<tr><td colspan="5">No files available</td></tr>';
+                        return;
+                    }
+
+                    files.forEach(file => {
+                        const row = document.createElement('tr');
+                        row.innerHTML = `
+                            <td>${file.filename}</td>
+                            <td><small>${file.cid}</small></td>
+                            <td>${formatBytes(file.size)}</td>
+                            <td>${file.available_on.length} nodes</td>
+                            <td><button onclick="downloadFile('${file.cid}', '${file.filename}')">Download</button></td>
+                        `;
+                        fileList.appendChild(row);
+                    });
+                } else {
+                    document.getElementById('fileList').innerHTML = '<tr><td colspan="5">Error loading files</td></tr>';
+                }
+            } catch (error) {
+                document.getElementById('fileList').innerHTML = '<tr><td colspan="5">Connection error</td></tr>';
+            }
+        }
+
+        // Download file with failback
+        async function downloadFile(cid, filename) {
+            let activeNode = getActiveNode();
+            if (!activeNode) {
+                alert('No active nodes available');
+                return;
+            }
+
+            // Try downloading from the current active node first
+            try {
+                window.location.href = `${activeNode}/api/files/${cid}?filename=${encodeURIComponent(filename)}`;
+                return;
+            } catch (error) {
+                console.log(`Failed to download from ${activeNode}: ${error}`);
+            }
+
+            // If failed, try other nodes
+            for (const node of nodes) {
+                if (node.active && node.url !== activeNode) {
+                    try {
+                        window.location.href = `${node.url}/api/files/${cid}?filename=${encodeURIComponent(filename)}`;
+                        return;
+                    } catch (error) {
+                        console.log(`Failed to download from ${node.url}: ${error}`);
+                    }
+                }
+            }
+
+            alert('Failed to download file from all available nodes');
+        }
+
+        // Helper function to format bytes
+        function formatBytes(bytes, decimals = 2) {
+            if (bytes === 0) return '0 Bytes';
+            const k = 1024;
+            const dm = decimals < 0 ? 0 : decimals;
+            const sizes = ['Bytes', 'KB', 'MB', 'GB', 'TB'];
+            const i = Math.floor(Math.log(bytes) / Math.log(k));
+            return parseFloat((bytes / Math.pow(k, i)).toFixed(dm)) + ' ' + sizes[i];
+        }
+
+        // Initialize
+        checkNodeStatus();
+        setInterval(checkNodeStatus, 5000); // Refresh status every 5 seconds
+    </script>
+</body>
+
+</html>
